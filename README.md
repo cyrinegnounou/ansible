@@ -1,164 +1,21 @@
-# ansible
----
-- hosts: node1
-  become: true # Run tasks with sudo privileges
-
-  vars:
-    ansible_pkg_mgr: apt # Specify that apt should be used
-    ssh_key_filename: my_ssh_key
-    target_username: farah
-    target_group: mygroup
-    package_name_1: nginx
-    package_name_2: mysql-server
-    is_sudoer: yes # change to 'no' if needed
-    package_list:
-      - nginx
-      - mysql-server
- 
-  tasks:
-    - name: Create success.log file
-      file:
-        path: /home/user/success.log
-        state: touch
-        mode: '0644'
-
-    - name: Check if group '{{ target_group }}' already exists
-      shell: getent group {{ target_group }}
-      register: existing_group
-      ignore_errors: true
-
-    - name: Create group '{{ target_group }}' if it doesn't exist
-      group:
-        name: "{{ target_group }}"
-        state: present
-      when: existing_group.rc != 0
-      register: create_group_result
-
-    - name: Print group existence message to terminal
-      debug:
-        msg: "Group '{{ target_group }}' already exists."
-      when: existing_group.rc == 0
-
-    - name: Write group existence message to success.log
-      lineinfile:
-        path: /home/user/success.log
-        line: "Group '{{ target_group }}' already exists."
-      when: existing_group.rc == 0
-    - name: Check if user '{{ target_username }}' already exists
-      shell: getent passwd "{{ target_username }}"
-      register: existing_user
-      ignore_errors: true
-
-    - name: Check if user '{{ target_username }}' already exists
-      shell: getent passwd {{ target_username }}
-      register: existing_user
-      ignore_errors: true
-
-    - name: Create user '{{ target_username }}' if it doesn't exist
-      user:
-        name: "{{ target_username }}"
-        state: present
-        createhome: yes
-        shell: /bin/bash
-        groups: "{{ target_group }}"  # Add the user to the specified group
-      when: existing_user.rc != 0
-      register: create_user_result
-
-    - name: Print user existence message to terminal
-      debug:
-        msg: "User '{{ target_username }}' already exists."
-      when: existing_user.rc == 0
-
-    - name: Write user creation success message to success.log
-      lineinfile:
-        path: /home/user/success.log
-        line: "Create user '{{ target_username }}': success"
-      when: create_user_result.changed
-
-    - name: Add '{{ target_username }}' user to sudoers file
-      lineinfile:
-        dest: /etc/sudoers
-        line: "{{ target_username }} ALL=(ALL) NOPASSWD:ALL"
-        validate: 'visudo -cf %s'
-      when: is_sudoer == 'yes'
-
-    - name: Ensure .ssh directory exists for user '{{ target_username }}'
-      file:
-        path: "/home/{{ target_username }}/.ssh"
-        state: directory
-        mode: '0700'
-        owner: "{{ target_username }}"
-        group: "{{ target_username }}"
-      when: existing_user.rc == 0
-
-    - name: Set authorized_keys file permissions
-      file:
-        path: "/home/{{ target_username }}/.ssh/authorized_keys"
-        state: touch
-        mode: '0600'
-        owner: "{{ target_username }}"
-        group: "{{ target_username }}"
-
-    - name: Generate SSH Key Pair
-      ansible.builtin.openssh_keypair:
-        path: "/home/{{ target_username }}/.ssh/my_ssh_key"
-        type: rsa
-        size: 2048
-        state: present
-      register: keygen_result
-
-    - name: Write 'Generate SSH key' success message
-      lineinfile:
-        path: /home/user/success.log
-        line: "Generate SSH key for {{ target_username }}: success"
-      when: keygen_result.changed
-
-    - name: Add public key to authorized_keys
-      authorized_key:
-        user: "{{ target_username }}"
-        key: "{{ lookup('file', '/home/user/.ssh/authorized_keys') }}"
-        state: present
-      register: add_key_result
-
-    - name: Write 'Add public key' success message
-      lineinfile:
-        path: /home/user/success.log
-        line: 'Add public key to authorized_keys: success'
-      when: add_key_result.changed
-
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-      register: update_cache_result
-
-    - name: Write 'Update apt cache' success message
-      lineinfile:
-        path: /home/user/success.log
-        line: 'Update apt cache: success'
-      when: update_cache_result.changed
-
-    - name: Install {{ package_name_1 }} package for regular users
-      apt:
-        name: "{{ package_name_1 }}"
-        state: present
-      when: "'regular' in user_roles"
-      register: package_install_result
-
-    - name: Write 'Install {{ package_name_1 }} package' success message
-      lineinfile:
-        path: /home/user/success.log
-        line: "Install {{ package_name_1 }} package: success"
-      when: package_install_result.changed
-
-    - name: Install {{ package_name_2 }} package
-      apt:
-        name: "{{ package_name_2 }}"
-        state: present
-      when: "'sudoer' in user_roles"
-      register: package_name_2_install_result
-
-    - name: Write 'Install {{ package_name_2 }} package' success message
-      lineinfile:
-        path: /home/user/success.log
-        line: 'Install {{ package_name_2 }} package: success'
-      when: package_name_2_install_result.changed
+le playbook que j'ai préparé  contient 5 variable:
+target_group :le groupe que vous voulez creer 
+target_username:le user que vous voulez creer 
+et is_sudoer : si vous voulez que ce user soit sudoer ou non 
+package_neme_1 et package_name_2
+--------------------------------------- 
+-creation d'un fichier "success.log" ou chaque etape reussite est ecrite dedans .
+-verifie si le groupe existe et retourne un message sur le terminal et en "success.log "
+sinon il realise sa creation 
+-verifie si le user existe et retourne un message sur le terminal et en "success.log" 
+sinon il realise sa creation
+-ajoute ce user au "target_group"
+- ajoute ce user au sudoers selon la variable is_sudoer 
+-assure .ssh directory est existante pour ce user 
+-set authorised_keys file permissions 
+-genere ssh key pair pour le user 
+-ajoute "public key" to authorized_keys 
+---------------------------------------
+-mise a jour de apt cache 
+-installation de package_name_1
+-installation de package_name_2
